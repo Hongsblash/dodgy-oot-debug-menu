@@ -7,13 +7,13 @@ SHELL = /bin/bash
 # Build options can either be changed by modifying the makefile, or by building with 'make SETTING=value'
 
 # If COMPARE is 1, check the output md5sum after building
-COMPARE ?= 1
+COMPARE ?= 0
 # If NON_MATCHING is 1, define the NON_MATCHING C flag when building
-NON_MATCHING ?= 0
+NON_MATCHING ?= 1
 # If ORIG_COMPILER is 1, compile with QEMU_IRIX and the original compiler
 ORIG_COMPILER ?= 0
 # If COMPILER is "gcc", compile with GCC instead of IDO.
-COMPILER ?= ido
+COMPILER ?= gcc
 
 CFLAGS ?=
 CPPFLAGS ?=
@@ -95,7 +95,7 @@ AS         := $(MIPS_BINUTILS_PREFIX)as
 LD         := $(MIPS_BINUTILS_PREFIX)ld
 OBJCOPY    := $(MIPS_BINUTILS_PREFIX)objcopy
 OBJDUMP    := $(MIPS_BINUTILS_PREFIX)objdump
-EMULATOR   ?= 
+EMULATOR   ?= '/mnt/c/Program Files (x86)/Project64 3.0/Project64.exe'
 EMU_FLAGS  ?= 
 
 INC := -Iinclude -Iinclude/libc -Isrc -Ibuild -I.
@@ -244,11 +244,16 @@ endif
 
 #### Main Targets ###
 
-all: $(ROM)
+all:
+	python3 install_mod_assets.py
+	make -j$(nproc) build
+
+build: $(ROM)
 ifeq ($(COMPARE),1)
 	@md5sum $(ROM)
 	@md5sum -c checksum.md5
 endif
+	cp $(ROM) /mnt/c/Users/Sam/Desktop/
 
 clean:
 	$(RM) -r $(ROM) $(ELF) build
@@ -269,11 +274,12 @@ setup:
 	python3 extract_baserom.py
 	python3 extract_assets.py -j$(N_THREADS)
 
-run: $(ROM)
+run:
+	make
 ifeq ($(EMULATOR),)
 	$(error Emulator path not set. Set EMULATOR in the Makefile or define it as an environment variable)
 endif
-	$(EMULATOR) $(EMU_FLAGS) $<
+	$(EMULATOR) $(EMU_FLAGS) $(ROM)
 
 
 .PHONY: all clean setup run distclean assetclean

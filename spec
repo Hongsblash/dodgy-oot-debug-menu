@@ -452,6 +452,7 @@ beginseg
     include "build/src/code/sleep.o"
     include "build/src/code/jpegutils.o"
     include "build/src/code/jpegdecoder.o"
+    include "build/src/code/enlightenment_screen.o"
     include "build/src/libultra/io/pfsfreeblocks.o"
     include "build/src/libultra/mgu/scale.o"
     include "build/src/libultra/gu/sinf.o"
@@ -10377,6 +10378,20 @@ beginseg
     name "ganontikasonogo_room_1"
     romalign 0x1000
     include "build/assets/scenes/dungeons/ganontikasonogo/ganontikasonogo_room_1.o"
+    number 3
+endseg
+
+beginseg
+    name "shadowed_dome_scene"
+    romalign 0x1000
+    include "build/assets/scenes/hollow/shadowed_dome/shadowed_dome_scene.o"
+    number 2
+endseg
+
+beginseg
+    name "shadowed_dome_room_0"
+    romalign 0x1000
+    include "build/assets/scenes/hollow/shadowed_dome/shadowed_dome_room_0.o"
     number 3
 endseg
 
