@@ -4,6 +4,8 @@
 #include "z64.h"
 #include "segment_symbols.h"
 
+#include "debug/debug.h"
+
 extern Mtx D_01000000;
 
 extern u32 osTvType;
@@ -232,4 +234,5 @@ extern GfxPool gGfxPools[2]; // 0x24820 bytes
 extern u8 gAudioHeap[0x38000]; // 0x38000 bytes
 extern u8 gSystemHeap[];
 
+extern Debug gDebug;
 #endif

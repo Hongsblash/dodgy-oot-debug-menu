@@ -452,7 +452,7 @@ beginseg
     include "build/src/code/sleep.o"
     include "build/src/code/jpegutils.o"
     include "build/src/code/jpegdecoder.o"
-    include "build/src/code/enlightenment_screen.o"
+    include "build/src/debug/debug_menu.o"
     include "build/src/libultra/io/pfsfreeblocks.o"
     include "build/src/libultra/mgu/scale.o"
     include "build/src/libultra/gu/sinf.o"

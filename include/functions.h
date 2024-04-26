@@ -1412,7 +1412,7 @@ s32 Math3D_XZInSphere(Sphere16* sphere, f32 x, f32 z);
 s32 Math3D_XYInSphere(Sphere16* sphere, f32 x, f32 y);
 s32 Math3D_YZInSphere(Sphere16* sphere, f32 y, f32 z);
 void Math3D_DrawSphere(PlayState* play, Sphere16* sph);
-void Math3D_DrawCylinder(PlayState* play, Cylinder16* cyl);
+void Math3D_DrawCylinder(PlayState* play, Cylinder16* cyl, u8 r, u8 g, u8 b, u8 a);
 s16 Math_Atan2S(f32 x, f32 y);
 f32 Math_Atan2F(f32 x, f32 y);
 void Matrix_Init(GameState* gameState);
@@ -1704,6 +1704,8 @@ void GfxPrint_Destroy(GfxPrint* this);
 void GfxPrint_Open(GfxPrint* this, Gfx* dList);
 Gfx* GfxPrint_Close(GfxPrint* this);
 s32 GfxPrint_Printf(GfxPrint* this, const char* fmt, ...);
+s32 GfxPrint_VPrintf(GfxPrint* this, const char* fmt, va_list args);
+s32 GfxPrint_PrintfScaled(GfxPrint* this, int scale, const char* fmt, ...);
 void RcpUtils_PrintRegisterStatus(void);
 void RcpUtils_Reset(void);
 void* Overlay_AllocateAndLoad(uintptr_t vromStart, uintptr_t vromEnd, void* vramStart, void* vramEnd);
@@ -1966,4 +1968,6 @@ void TitleSetup_Destroy(GameState* thisx);
 void FileSelect_Init(GameState* thisx);
 void FileSelect_Destroy(GameState* thisx);
 
+void DataMenu_Update(DataMenu* this, GraphicsContext* gfxCtx, PlayState* play);
+void Environment_UpdateRain(PlayState* play);
 #endif

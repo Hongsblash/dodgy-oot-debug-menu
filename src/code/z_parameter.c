@@ -3106,6 +3106,8 @@ void func_8008A994(InterfaceContext* interfaceCtx) {
     View_ApplyOrthoToOverlay(&interfaceCtx->view);
 }
 
+DataMenu dataMenu;
+
 void Interface_Draw(PlayState* play) {
     static s16 magicArrowEffectsR[] = { 255, 100, 255 };
     static s16 magicArrowEffectsG[] = { 0, 100, 255 };
@@ -3147,6 +3149,8 @@ void Interface_Draw(PlayState* play) {
     if (pauseCtx->debugState == 0) {
         Interface_InitVertices(play);
         func_8008A994(interfaceCtx);
+
+        if (!gDebug.isHudHidden) {
         Health_DrawMeter(play);
 
         Gfx_SetupDL_39Overlay(play->state.gfxCtx);
@@ -3951,6 +3955,8 @@ void Interface_Draw(PlayState* play) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx, "../z_parameter.c", 4269);
+    }
+    DataMenu_Update(&dataMenu, play->state.gfxCtx, play);
 }
 
 void Interface_Update(PlayState* play) {

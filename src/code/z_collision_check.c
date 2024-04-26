@@ -1106,7 +1106,7 @@ void Collider_Draw(PlayState* play, Collider* collider) {
             break;
         case COLSHAPE_CYLINDER:
             cylinder = (ColliderCylinder*)collider;
-            Math3D_DrawCylinder(play, &cylinder->dim);
+            Math3D_DrawCylinder(play, &cylinder->dim, 255, 255, 255, 255);
             break;
         case COLSHAPE_TRIS:
             tris = (ColliderTris*)collider;

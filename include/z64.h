@@ -784,4 +784,6 @@ typedef struct {
     /* 0x84 */ u32 unk_84;
 } ViMode; // size = 0x88
 
+#include "debug/debug.h"
+
 #endif

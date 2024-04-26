@@ -233,6 +233,89 @@ void GfxPrint_PrintCharImpl(GfxPrint* this, u8 c) {
     this->posX += GFX_CHAR_X_SPACING << 2;
 }
 
+void GfxPrint_PrintCharScaledImpl(GfxPrint* this, u8 c) {
+    u32 tile = (c & 0xFF) * 2;
+    u16 s = (u16)(c & 4) * 64;
+    u16 t = (u16)(c >> 3) * 256;
+
+    if (this->flags & GFXP_FLAG_UPDATE) {
+        this->flags &= ~GFXP_FLAG_UPDATE;
+        gDPPipeSync(this->dList++);
+        if (this->flags & GFXP_FLAG_RAINBOW) {
+            gDPSetTextureLUT(this->dList++, G_TT_RGBA16);
+            gDPSetCycleType(this->dList++, G_CYC_2CYCLE);
+            gDPSetRenderMode(this->dList++, G_RM_PASS, G_RM_XLU_SURF2);
+            gDPSetCombineMode(this->dList++, G_CC_INTERFERENCE, G_CC_PASS2);
+        } else {
+            gDPSetTextureLUT(this->dList++, G_TT_IA16);
+            gDPSetCycleType(this->dList++, G_CYC_1CYCLE);
+            gDPSetRenderMode(this->dList++, G_RM_XLU_SURF, G_RM_XLU_SURF2);
+            gDPSetCombineMode(this->dList++, G_CC_MODULATEIDECALA_PRIM, G_CC_MODULATEIDECALA_PRIM);
+        }
+    }
+
+    // Set dsdx and dtdy according to scale
+    int dsdx = 1 << (9 + this->scale);
+    int dtdy = dsdx; // Same scaling for x and y
+
+    // Calculate the offset for posX and posY based on the scale
+    int offset = (int)(84.0 / (this->scale + 1) - 10);
+
+    // Render the texture rectangle
+    gSPTextureRectangle(this->dList++,
+                        this->posX, this->posY,
+                        this->posX + offset, this->posY + offset, 
+                        tile, s, t, dsdx, dtdy);
+
+    // Update position for next character, increment based on current character width
+    this->posX += offset; // Position increment adjusts with scaled width
+}
+
+void GfxPrint_PrintCharScaled(GfxPrint* this, u8 c) {
+    u8 charParam = c;
+
+    int scale = this->scale;
+
+    if (c == ' ') {
+        this->posX += GFX_CHAR_X_SPACING << 2 - (this->scale - 1);
+    } else if (c > ' ' && c < 0x7F) {
+        GfxPrint_PrintCharScaledImpl(this, charParam);
+    } else if (c >= 0xA0 && c < 0xE0) {
+        if (this->flags & GFXP_FLAG_HIRAGANA) {
+            charParam = (c < 0xC0) ? (c - 0x20) : (c + 0x20);
+        }
+        GfxPrint_PrintCharScaledImpl(this, charParam);
+    } else {
+        // Handle special characters or fallbacks
+        switch (c) {
+            case '\n':
+                this->posY += 16 << 2 - (this->scale - 1);
+                FALLTHROUGH;
+            case '\r':
+                this->posX = this->baseX;
+                break;
+            case '\t':
+                do {
+                    GfxPrint_PrintCharScaledImpl(this, ' ');
+                } while ((this->posX - this->baseX) % (256 * scale / 1024) != 0);
+                break;
+            case GFXP_HIRAGANA_CHAR:
+                this->flags |= GFXP_FLAG_HIRAGANA;
+                break;
+            case GFXP_KATAKANA_CHAR:
+                this->flags &= ~GFXP_FLAG_HIRAGANA;
+                break;
+            case GFXP_RAINBOW_ON_CHAR:
+            case GFXP_RAINBOW_OFF_CHAR:
+                this->flags ^= GFXP_FLAG_RAINBOW;
+                this->flags |= GFXP_FLAG_UPDATE;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
 void GfxPrint_PrintChar(GfxPrint* this, u8 c) {
     u8 charParam = c;
 
@@ -295,10 +378,26 @@ void GfxPrint_PrintStringWithSize(GfxPrint* this, const void* buffer, u32 charSi
     }
 }
 
+void GfxPrint_PrintStringWithSizeScaled(GfxPrint* this, const void* buffer, u32 charSize, u32 charCount) {
+    const char* str = (const char*)buffer;
+    u32 count = charSize * charCount;
+
+    while (count != 0) {
+        GfxPrint_PrintCharScaled(this, *(str++));
+        count--;
+    }
+}
+
 void GfxPrint_PrintString(GfxPrint* this, const char* str) {
     while (*str != '\0') {
         GfxPrint_PrintChar(this, *(str++));
     }
+}
+
+void* GfxPrint_CallbackScaled(void* arg, const char* str, size_t size) {
+    GfxPrint* this = (GfxPrint*)arg;
+    GfxPrint_PrintStringWithSizeScaled(this, str, sizeof(char), size);
+    return this;
 }
 
 void* GfxPrint_Callback(void* arg, const char* str, size_t size) {
@@ -360,6 +459,16 @@ s32 GfxPrint_VPrintf(GfxPrint* this, const char* fmt, va_list args) {
     return PrintUtils_VPrintf(&this->callback, fmt, args);
 }
 
+s32 GfxPrint_VPrintfScaled(GfxPrint* this, int scale, const char* fmt, va_list args) {
+    this->scale = scale;
+
+    // Temporarily switch callback for scaled printing
+    void* (*prevCallback)(void*, const char*, size_t, int) = this->callback;
+    this->callback = (void* (*)(void*, const char*, size_t))GfxPrint_CallbackScaled;
+    
+    return PrintUtils_VPrintf(&this->callback, fmt, args);
+}
+
 s32 GfxPrint_Printf(GfxPrint* this, const char* fmt, ...) {
     s32 ret;
     va_list args;
@@ -367,6 +476,32 @@ s32 GfxPrint_Printf(GfxPrint* this, const char* fmt, ...) {
 
     ret = GfxPrint_VPrintf(this, fmt, args);
 
+    va_end(args);
+
+    return ret;
+}
+
+s32 GfxPrint_PrintfScaled(GfxPrint* this, int scale, const char* fmt, ...) {
+    s32 ret;
+    va_list args;
+
+    // Start variadic arguments
+    va_start(args, fmt);
+
+    // Set scale in GfxPrint object
+    this->scale = scale;
+
+    // Temporarily switch callback for scaled printing
+    void* (*prevCallback)(void*, const char*, size_t, int) = this->callback;
+    this->callback = (void* (*)(void*, const char*, size_t))GfxPrint_CallbackScaled;
+
+    // Perform print with scaled characters
+    ret = PrintUtils_VPrintf(&this->callback, fmt, args);  // Adjust PrintUtils_VPrintf if necessary to pass scale
+
+    // Restore original callback
+    this->callback = prevCallback;
+
+    // End variadic arguments
     va_end(args);
 
     return ret;
