@@ -1483,7 +1483,7 @@ void DataMenu_ActorViewer(DataMenu* this, PlayState* play) {
                 f32 speed = actor->speed;
                 s16 id = actor->id;
 
-                Debug_TextScaled(play, 2, U32_RGB(0xFFFFFFFF), 1, 30 - actorCount - 2, 
+                Debug_TextScaled(play, 1, U32_RGB(0xFFFFFFFF), 1, 30 - actorCount - 2, 
                     "ID: %d, Pos: (%.2f, %.2f, %.2f), Speed: %.2f", 
                     id, actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, speed);
             }
@@ -1585,6 +1585,13 @@ void DataMenu_Update(DataMenu* this, GraphicsContext* gfxCtx, PlayState* play) {
     DataMenu_ZeldaArenaMemView(play);
     DataMenu_ObjectMemView(play);
 
+    int scale;
+
+    for (scale = 0; scale <= 8; scale++) {
+        // Using Debug_TextScaled to display the scale for font sizes
+        Debug_TextScaled(play, scale, 255, 255, 255, 1, 28 - scale*2, "font size %d", scale);
+    }
+
     if (debugSysCtx->isMenuOpen) {
         DataMenu_DrawColorRectangle(gfxCtx); // Draw menu background
         DataMenu_ProcessInput(this, play, gfxCtx); // Process input
@@ -1641,7 +1648,7 @@ void DataMenu_DrawText(GraphicsContext* gfxCtx, const char* text, s32 x, s32 y, 
     GfxPrint_Open(&gfxPrint, gfx);
     GfxPrint_SetColor(&gfxPrint, r, g, b, a);
     GfxPrint_SetPos(&gfxPrint, x, y);
-    GfxPrint_PrintfScaled(&gfxPrint, 2, "%s", text);
+    GfxPrint_PrintfScaled(&gfxPrint, 3, "%s", text);
     gfx = GfxPrint_Close(&gfxPrint);  
     GfxPrint_Destroy(&gfxPrint);
 

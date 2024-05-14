@@ -187,12 +187,9 @@ void GfxPrint_SetBasePosPx(GfxPrint* this, s32 x, s32 y) {
     this->baseY = y << 2;
 }
 
-void GfxPrint_PrintCharImpl(GfxPrint* this, u8 c) {
-    u32 tile = (c & 0xFF) * 2;
-
+void GfxPrint_UpdatePipelineIfNeeded(GfxPrint* this) {
     if (this->flags & GFXP_FLAG_UPDATE) {
         this->flags &= ~GFXP_FLAG_UPDATE;
-
         gDPPipeSync(this->dList++);
         if (this->flags & GFXP_FLAG_RAINBOW) {
             gDPSetTextureLUT(this->dList++, G_TT_RGBA16);
@@ -206,6 +203,12 @@ void GfxPrint_PrintCharImpl(GfxPrint* this, u8 c) {
             gDPSetCombineMode(this->dList++, G_CC_MODULATEIDECALA_PRIM, G_CC_MODULATEIDECALA_PRIM);
         }
     }
+}
+
+void GfxPrint_PrintCharImpl(GfxPrint* this, u8 c) {
+    u32 tile = (c & 0xFF) * 2;
+
+    GfxPrint_UpdatePipelineIfNeeded(this);
 
     if (this->flags & GFXP_FLAG_SHADOW) {
         gDPSetColor(this->dList++, G_SETPRIMCOLOR, 0);
@@ -237,31 +240,41 @@ void GfxPrint_PrintCharScaledImpl(GfxPrint* this, u8 c) {
     u32 tile = (c & 0xFF) * 2;
     u16 s = (u16)(c & 4) * 64;
     u16 t = (u16)(c >> 3) * 256;
+    int dsdx;
+    int dtdy;
+    static const float offsetAdjustment[9] = {60.0, 84.0, 90.0, 86.0, 88.0, 84.0, 80.0, 78.0, 71.0};
 
-    if (this->flags & GFXP_FLAG_UPDATE) {
-        this->flags &= ~GFXP_FLAG_UPDATE;
-        gDPPipeSync(this->dList++);
-        if (this->flags & GFXP_FLAG_RAINBOW) {
-            gDPSetTextureLUT(this->dList++, G_TT_RGBA16);
-            gDPSetCycleType(this->dList++, G_CYC_2CYCLE);
-            gDPSetRenderMode(this->dList++, G_RM_PASS, G_RM_XLU_SURF2);
-            gDPSetCombineMode(this->dList++, G_CC_INTERFERENCE, G_CC_PASS2);
-        } else {
-            gDPSetTextureLUT(this->dList++, G_TT_IA16);
-            gDPSetCycleType(this->dList++, G_CYC_1CYCLE);
-            gDPSetRenderMode(this->dList++, G_RM_XLU_SURF, G_RM_XLU_SURF2);
-            gDPSetCombineMode(this->dList++, G_CC_MODULATEIDECALA_PRIM, G_CC_MODULATEIDECALA_PRIM);
-        }
+    GfxPrint_UpdatePipelineIfNeeded(this);
+
+    // Set dsdx according to scale using a formula
+    if (this->scale % 2 == 0) {
+        dsdx = 1 << (9 + this->scale / 2);
+    } else {
+        dsdx = (1 << (9 + (this->scale - 1) / 2)) | (1 << (8 + (this->scale - 1) / 2));
     }
 
-    // Set dsdx and dtdy according to scale
-    int dsdx = 1 << (9 + this->scale);
-    int dtdy = dsdx; // Same scaling for x and y
+    // Adjust offset based on specific scales using a lookup table
+    float offsetFactor = (this->scale >= 0 && this->scale <= 8) ? offsetAdjustment[this->scale] : 84.0;
+    int offset = (int)(offsetFactor / (this->scale + 1));
 
-    // Calculate the offset for posX and posY based on the scale
-    int offset = (int)(84.0 / (this->scale + 1) - 10);
+    dtdy = dsdx; // Same scaling for x and y
 
-    // Render the texture rectangle
+    // Calculate adjusted values for the shadow's posX and posY based on scale
+    int adjustedPos = (6 - this->scale) + 2;
+
+    // Render the texture rectangle for the shadow
+    if (this->flags & GFXP_FLAG_SHADOW) {
+        gDPSetColor(this->dList++, G_SETPRIMCOLOR, 0);
+
+        gSPTextureRectangle(this->dList++, 
+                            this->posX + adjustedPos, this->posY + adjustedPos, 
+                            this->posX + offset + adjustedPos, this->posY + offset + adjustedPos,
+                            tile, s, t, dsdx, dtdy);
+
+        gDPSetColor(this->dList++, G_SETPRIMCOLOR, this->color.rgba);
+    }
+
+    // Render the texture rectangle for the text
     gSPTextureRectangle(this->dList++,
                         this->posX, this->posY,
                         this->posX + offset, this->posY + offset, 
@@ -274,13 +287,19 @@ void GfxPrint_PrintCharScaledImpl(GfxPrint* this, u8 c) {
 void GfxPrint_PrintCharScaled(GfxPrint* this, u8 c) {
     u8 charParam = c;
 
-    int scale = this->scale;
+    // Calculate the x and y spacing based on the scale
+    int xSpacing = (int)(GFX_CHAR_X_SPACING * (2.0 / (this->scale + 1)));
+    int ySpacing = (int)(16 * (2.0 / (this->scale + 1)));
+    int spaceSpacing = (int)(xSpacing * 2);
 
     if (c == ' ') {
-        this->posX += GFX_CHAR_X_SPACING << 2 - (this->scale - 1);
+        // Move the cursor to the right for a space character with increased spacing
+        this->posX += spaceSpacing;
     } else if (c > ' ' && c < 0x7F) {
+        // Print regular ASCII characters
         GfxPrint_PrintCharScaledImpl(this, charParam);
     } else if (c >= 0xA0 && c < 0xE0) {
+        // Handle Hiragana characters if the flag is set
         if (this->flags & GFXP_FLAG_HIRAGANA) {
             charParam = (c < 0xC0) ? (c - 0x20) : (c + 0x20);
         }
@@ -289,7 +308,8 @@ void GfxPrint_PrintCharScaled(GfxPrint* this, u8 c) {
         // Handle special characters or fallbacks
         switch (c) {
             case '\n':
-                this->posY += 16 << 2 - (this->scale - 1);
+                // Move the cursor to the next line
+                this->posY += ySpacing;
                 FALLTHROUGH;
             case '\r':
                 this->posX = this->baseX;
@@ -297,7 +317,7 @@ void GfxPrint_PrintCharScaled(GfxPrint* this, u8 c) {
             case '\t':
                 do {
                     GfxPrint_PrintCharScaledImpl(this, ' ');
-                } while ((this->posX - this->baseX) % (256 * scale / 1024) != 0);
+                } while ((this->posX - this->baseX) % (256 * this->scale / 1024) != 0);
                 break;
             case GFXP_HIRAGANA_CHAR:
                 this->flags |= GFXP_FLAG_HIRAGANA;
@@ -496,7 +516,7 @@ s32 GfxPrint_PrintfScaled(GfxPrint* this, int scale, const char* fmt, ...) {
     this->callback = (void* (*)(void*, const char*, size_t))GfxPrint_CallbackScaled;
 
     // Perform print with scaled characters
-    ret = PrintUtils_VPrintf(&this->callback, fmt, args);  // Adjust PrintUtils_VPrintf if necessary to pass scale
+    ret = PrintUtils_VPrintf(&this->callback, fmt, args);
 
     // Restore original callback
     this->callback = prevCallback;
